@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カゲマスレベルシミュレーター</title>
+    <meta name="description" content="「陰の実力者になりたくて！マスターオブガーデン」のキャラクターレベルと装備ランクの計算を行うシミュレーターです。将来の解放予定日も自動計算します。">
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 20px auto; padding: 0 20px; background-color: #f4f7f9; }
+        h1 { color: #2c3e50; border-left: 5px solid #2c3e50; padding-left: 15px; margin-bottom: 20px; }
+        .status-card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #ddd; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.9rem; }
+        .cap-val { font-weight: bold; color: #2980b9; }
+        .calc-container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 40px; display: flex; gap: 20px; flex-wrap: wrap; }
+        .calc-box { flex: 1; min-width: 300px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+        input[type="number"] { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 1.2rem; box-sizing: border-box; }
+        .output-area { background: #fdfdfd; padding: 15px; border-radius: 5px; border: 1px solid #eee; margin-top: 10px; }
+        .output-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 1.1rem; }
+        .color-safe { color: #3498db; } 
+        .color-over { color: #e74c3c; font-weight: bold; }
+        .table-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+        th { background-color: #2c3e50; color: white; }
+        tr:nth-child(even) { background-color: #fafafa; }
+        .past-row { background-color: #f1f1f1; color: #888; }
+        .next-row { background-color: #eef7ff !important; font-weight: bold; border: 2px solid #3498db; }
+    </style>
+</head>
+<body>
+
+    <h1>カゲマスレベルシミュレーター</h1>
+
+    <div class="status-card">
+        <p>【現日時のシステム上限】</p>
+        <div class="status-grid">
+            <div>キャラクターLV: <span id="cap_lv" class="cap-val">-</span></div>
+            <div>装備ランク: <span id="cap_rank" class="cap-val">-</span></div>
+            <div>ダメージ上限解放LV: <span id="cap_rel" class="cap-val">-</span></div>
+        </div>
+    </div>
+
+    <div class="calc-container">
+        <div class="calc-box">
+            <label style="font-weight:bold; font-size:0.9rem;">LVから判定</label>
+            <input type="number" id="input_lv" value="224" min="1" oninput="runCalc()" onwheel="handleWheel(event, 'input_lv')">
+            <div class="output-area">
+                <div class="output-item">判定LV: <span id="out_lv_val">-</span></div>
+                <div class="output-item">計算ランク: <span id="out_rank_val">-</span></div>
+                <div class="output-item">解放LV: <span id="out_rel_val">-</span></div>
+            </div>
+        </div>
+
+        <div class="calc-box">
+            <label style="font-weight:bold; font-size:0.9rem;">ランクから判定</label>
+            <input type="number" id="input_rank" value="29" min="1" oninput="runCalcByRank()" onwheel="handleWheel(event, 'input_rank')">
+            <div class="output-area">
+                <div class="output-item">必要LV: <span id="out_lv_val_r">-</span></div>
+                <div class="output-item">目標ランク: <span id="out_rank_val_r">-</span></div>
+                <div class="output-item">解放LV: <span id="out_rel_val_r">-</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <h2>解放予定ロードマップ (直近と今後10回)</h2>
+        <table id="roadmap_table">
+            <thead>
+                <tr>
+                    <th>予定日(13:00)</th>
+                    <th>LV上限</th>
+                    <th>ランク上限</th>
+                    <th>上限解放LV</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const BASE_DATE = new Date('2026-05-07T13:00:00');
+        const BASE_LV = 224;
+        const LV_INT = 28 * 24 * 60 * 60 * 1000;
+
+        /**
+         * 修正版ランク計算ロジック
+         */
+        function calculateRank(lv) {
+            if (lv >= 11) return 4 + Math.floor((lv - 11) / 8);
+            if (lv >= 4) return 3;
+            return 2; // LV1-3はランク2
+        }
+
+        function calculateRelease(rank) {
+            return (rank < 8) ? 0 : 1 + Math.floor((rank - 8) / 5);
+        }
+
+        function getCaps(targetDate) {
+            const elapsed = targetDate - BASE_DATE;
+            const cyclesLv = Math.max(0, Math.floor(elapsed / LV_INT));
+            const lv = BASE_LV + (cyclesLv * 4);
+            const rank = 29 + Math.floor((cyclesLv + 1) / 2);
+            return { lv, rank, rel: calculateRelease(rank) };
+        }
+
+        function runCalc() {
+            const nowCaps = getCaps(new Date());
+            const lv = parseInt(document.getElementById('input_lv').value) || 1;
+            const rank = calculateRank(lv);
+            const rel = calculateRelease(rank);
+
+            update('out_lv_val', 'LV ' + lv, lv > nowCaps.lv);
+            update('out_rank_val', 'Rank ' + rank, rank > nowCaps.rank);
+            update('out_rel_val', '解放LV ' + rel, rel > nowCaps.rel);
+            
+            document.getElementById('cap_lv').innerText = nowCaps.lv;
+            document.getElementById('cap_rank').innerText = nowCaps.rank;
+            document.getElementById('cap_rel').innerText = nowCaps.rel;
+        }
+
+        function runCalcByRank() {
+            const nowCaps = getCaps(new Date());
+            const rank = parseInt(document.getElementById('input_rank').value) || 1;
+            
+            let lv;
+            if (rank >= 4) {
+                lv = (rank - 4) * 8 + 11;
+            } else if (rank === 3) {
+                lv = 4;
+            } else {
+                lv = 1;
+            }
+            
+            const rel = calculateRelease(rank);
+
+            update('out_lv_val_r', 'LV ' + lv, lv > nowCaps.lv);
+            update('out_rank_val_r', 'Rank ' + rank, rank > nowCaps.rank);
+            update('out_rel_val_r', '解放LV ' + rel, rel > nowCaps.rel);
+        }
+
+        function update(id, text, isOver) {
+            const el = document.getElementById(id);
+            el.innerText = text;
+            el.className = isOver ? 'color-over' : 'color-safe';
+        }
+
+        function generateRoadmap() {
+            const tbody = document.querySelector('#roadmap_table tbody');
+            tbody.innerHTML = '';
+            const now = new Date();
+            const nowCaps = getCaps(now);
+            const currentCycle = Math.floor((now - BASE_DATE) / LV_INT);
+            
+            for (let i = currentCycle - 1; i <= currentCycle + 10; i++) {
+                if (i < 0) continue;
+                const date = new Date(BASE_DATE.getTime() + (i * LV_INT));
+                const caps = getCaps(date);
+                const row = document.createElement('tr');
+                if (i < currentCycle) row.className = 'past-row';
+                else if (i === currentCycle) row.className = 'next-row';
+
+                const lvClass = caps.lv > nowCaps.lv ? 'color-over' : 'color-safe';
+                const rankClass = caps.rank > nowCaps.rank ? 'color-over' : 'color-safe';
+                const relClass = caps.rel > nowCaps.rel ? 'color-over' : 'color-safe';
+
+                row.innerHTML = `
+                    <td>${date.toLocaleDateString()} ${date.getHours()}:00</td>
+                    <td class="${lvClass}">LV ${caps.lv}</td>
+                    <td class="${rankClass}">Rank ${caps.rank}</td>
+                    <td class="${relClass}">解放LV ${caps.rel}</td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        function handleWheel(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(id);
+            let v = parseInt(el.value) || 1;
+            el.value = (e.deltaY < 0) ? v + 1 : Math.max(1, v - 1);
+            id === 'input_lv' ? runCalc() : runCalcByRank();
+        }
+
+        window.onload = () => { generateRoadmap(); runCalc(); runCalcByRank(); };
+    </script>
+</body>
+</html>
