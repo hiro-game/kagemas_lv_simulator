@@ -3,67 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>カゲマスレベルシミュレーター</title>
+    <title>KageMas_Simulator</title>
     <meta name="description" content="「陰の実力者になりたくて！マスターオブガーデン」のキャラクターレベルと装備ランクの計算を行うシミュレーターです。将来の解放予定日も自動計算します。">
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 20px auto; padding: 0 20px; background-color: #f4f7f9; }
-        h1 { color: #2c3e50; border-left: 5px solid #2c3e50; padding-left: 15px; margin-bottom: 20px; }
-        .status-card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #ddd; }
-        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 0.9rem; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 0 10px; background-color: #f4f7f9; }
+        
+        /* 固定ヘッダーエリア */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background-color: #f4f7f9;
+            z-index: 100;
+            padding-top: 20px;
+            padding-bottom: 10px;
+        }
+
+        h1 { color: #2c3e50; border-left: 5px solid #2c3e50; padding-left: 15px; margin: 0 0 15px 0; font-size: 1.5rem; }
+        
+        .status-card { background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #ddd; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 0.85rem; }
         .cap-val { font-weight: bold; color: #2980b9; }
-        .calc-container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 40px; display: flex; gap: 20px; flex-wrap: wrap; }
-        .calc-box { flex: 1; min-width: 300px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
-        input[type="number"] { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 1.2rem; box-sizing: border-box; }
-        .output-area { background: #fdfdfd; padding: 15px; border-radius: 5px; border: 1px solid #eee; margin-top: 10px; }
-        .output-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 1.1rem; }
+
+        /* 入力・計算エリア */
+        .calc-container { 
+            display: flex; 
+            gap: 15px; 
+            margin: 15px 0; 
+            flex-wrap: wrap; 
+        }
+        .calc-box { 
+            flex: 1; 
+            min-width: 280px; 
+            padding: 15px; 
+            background: white; 
+            border: 1px solid #eee; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        input[type="number"] { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 1.1rem; box-sizing: border-box; margin-bottom: 10px; }
+        
+        /* 結果表示エリアの余白を縮小 */
+        .output-area { background: #fdfdfd; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
+        .output-item { display: flex; justify-content: flex-start; gap: 10px; margin-bottom: 2px; font-size: 1rem; }
+        .output-label { color: #666; font-size: 0.9rem; min-width: 80px; }
+
         .color-safe { color: #3498db; } 
         .color-over { color: #e74c3c; font-weight: bold; }
-        .table-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
-        th { background-color: #2c3e50; color: white; }
+
+        /* ロードマップテーブル */
+        .table-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 40px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 0.9rem; }
+        th { background-color: #2c3e50; color: white; position: sticky; top: -1px; } /* テーブル見出しも固定 */
         tr:nth-child(even) { background-color: #fafafa; }
         .past-row { background-color: #f1f1f1; color: #888; }
         .next-row { background-color: #eef7ff !important; font-weight: bold; border: 2px solid #3498db; }
+
+        /* スマホ向けの縦並び調整 */
+        @media (max-width: 600px) {
+            .calc-container { flex-direction: column; }
+            .calc-box { min-width: 100%; }
+            .status-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 1.2rem; }
+            .output-item { justify-content: space-between; } /* スマホ時は端と端に寄せる */
+        }
     </style>
 </head>
 <body>
 
-    <h1>カゲマスレベルシミュレーター</h1>
-
-    <div class="status-card">
-        <p>【現日時のシステム上限】</p>
-        <div class="status-grid">
-            <div>キャラクターLV: <span id="cap_lv" class="cap-val">-</span></div>
-            <div>装備ランク: <span id="cap_rank" class="cap-val">-</span></div>
-            <div>ダメージ上限解放LV: <span id="cap_rel" class="cap-val">-</span></div>
+    <div class="sticky-header">
+        <h1>KageMas_Simulator</h1>
+        <div class="status-card">
+            <div class="status-grid">
+                <div>キャラクターLV上限: <span id="cap_lv" class="cap-val">-</span></div>
+                <div>装備ランク上限: <span id="cap_rank" class="cap-val">-</span></div>
+                <div>ダメージ上限解放LV: <span id="cap_rel" class="cap-val">-</span></div>
+            </div>
         </div>
     </div>
 
     <div class="calc-container">
         <div class="calc-box">
-            <label style="font-weight:bold; font-size:0.9rem;">LVから判定</label>
+            <label style="font-weight:bold; font-size:0.85rem;">LVから判定</label>
             <input type="number" id="input_lv" value="224" min="1" oninput="runCalc()" onwheel="handleWheel(event, 'input_lv')">
             <div class="output-area">
-                <div class="output-item">判定LV: <span id="out_lv_val">-</span></div>
-                <div class="output-item">計算ランク: <span id="out_rank_val">-</span></div>
-                <div class="output-item">解放LV: <span id="out_rel_val">-</span></div>
+                <div class="output-item"><span class="output-label">判定LV:</span><span id="out_lv_val">-</span></div>
+                <div class="output-item"><span class="output-label">計算ランク:</span><span id="out_rank_val">-</span></div>
+                <div class="output-item"><span class="output-label">解放LV:</span><span id="out_rel_val">-</span></div>
             </div>
         </div>
 
         <div class="calc-box">
-            <label style="font-weight:bold; font-size:0.9rem;">ランクから判定</label>
+            <label style="font-weight:bold; font-size:0.85rem;">ランクから判定</label>
             <input type="number" id="input_rank" value="29" min="1" oninput="runCalcByRank()" onwheel="handleWheel(event, 'input_rank')">
             <div class="output-area">
-                <div class="output-item">必要LV: <span id="out_lv_val_r">-</span></div>
-                <div class="output-item">目標ランク: <span id="out_rank_val_r">-</span></div>
-                <div class="output-item">解放LV: <span id="out_rel_val_r">-</span></div>
+                <div class="output-item"><span class="output-label">必要LV:</span><span id="out_lv_val_r">-</span></div>
+                <div class="output-item"><span class="output-label">目標ランク:</span><span id="out_rank_val_r">-</span></div>
+                <div class="output-item"><span class="output-label">解放LV:</span><span id="out_rel_val_r">-</span></div>
             </div>
         </div>
     </div>
 
     <div class="table-container">
-        <h2>解放予定ロードマップ (直近と今後10回)</h2>
+        <h2 style="font-size: 1.1rem; margin-top: 0;">解放予定ロードマップ</h2>
         <table id="roadmap_table">
             <thead>
                 <tr>
@@ -82,13 +125,10 @@
         const BASE_LV = 224;
         const LV_INT = 28 * 24 * 60 * 60 * 1000;
 
-        /**
-         * 修正版ランク計算ロジック
-         */
         function calculateRank(lv) {
             if (lv >= 11) return 4 + Math.floor((lv - 11) / 8);
             if (lv >= 4) return 3;
-            return 2; // LV1-3はランク2
+            return 2; 
         }
 
         function calculateRelease(rank) {
@@ -121,16 +161,7 @@
         function runCalcByRank() {
             const nowCaps = getCaps(new Date());
             const rank = parseInt(document.getElementById('input_rank').value) || 1;
-            
-            let lv;
-            if (rank >= 4) {
-                lv = (rank - 4) * 8 + 11;
-            } else if (rank === 3) {
-                lv = 4;
-            } else {
-                lv = 1;
-            }
-            
+            let lv = (rank >= 4) ? (rank - 4) * 8 + 11 : (rank === 3 ? 4 : 1);
             const rel = calculateRelease(rank);
 
             update('out_lv_val_r', 'LV ' + lv, lv > nowCaps.lv);
